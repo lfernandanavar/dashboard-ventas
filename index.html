@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Ventas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #F6EEE8;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            padding: 16px;
+            height: 100vh;
+            overflow: hidden;
+            color: #4A3B32;
+        }
+
+        .dashboard-layout {
+            display: flex;
+            gap: 18px;
+            height: calc(100vh - 32px);
+            overflow: hidden;
+        }
+
+        /* ── PANEL IZQUIERDO ── */
+        .left-table {
+            flex: 0 0 52%;
+            min-width: 640px;
+            background: #FFFFFF;
+            border-radius: 20px;
+            border: 1px solid #E8DCCB;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 14px 20px 10px;
+            border-bottom: 1.5px solid #EFD9D5;
+            flex-shrink: 0;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+        .table-header h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #5E3E2E;
+        }
+        .table-header .header-meta {
+            font-size: 0.7rem;
+            color: #B19F8F;
+        }
+        .header-meta .bad-count { color: #C0392B; font-weight: 600; }
+
+        .search-bar {
+            padding: 10px 16px;
+            border-bottom: 1px solid #EFD9D5;
+            flex-shrink: 0;
+        }
+        .search-bar input {
+            width: 100%;
+            font-size: 0.78rem;
+            padding: 7px 14px;
+            border: 1px solid #E8DCCB;
+            border-radius: 999px;
+            background: #FEFCFA;
+            color: #4A3B32;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-bar input:focus { border-color: #8B6A5B; box-shadow: 0 0 0 2px rgba(139,106,91,0.1); }
+        .search-bar input::placeholder { color: #C2A88D; }
+
+        .table-wrapper { flex: 1; overflow: auto; min-height: 0; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+        thead th {
+            background: #EFD9D5;
+            color: #5E3E2E;
+            font-weight: 600;
+            font-size: 0.67rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 8px 10px;
+            border-bottom: 1.5px solid #E8DCCB;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            cursor: pointer;
+            user-select: none;
+        }
+        thead th:hover { background: #E4CECA; }
+        thead th.sort-asc::after  { content: " ↑"; opacity: 0.6; }
+        thead th.sort-desc::after { content: " ↓"; opacity: 0.6; }
+
+        tbody td {
+            padding: 7px 10px;
+            border-bottom: 1px solid #F0E4DC;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        tbody tr:hover td { background: #FDF7F3; }
+        tbody tr:last-child td { border-bottom: none; }
+        .row-bad td { background: #fff0ee !important; color: #A32D2D; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+        .badge-ok  { background: #E8F2E0; color: #3B6D11; }
+        .badge-err { background: #FCDCD8; color: #A32D2D; }
+
+        .pager {
+            padding: 8px 16px;
+            border-top: 1px solid #EFD9D5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .pager-info { font-size: 0.68rem; color: #B19F8F; }
+        .pager-btns { display: flex; gap: 4px; }
+        .pager-btn {
+            padding: 3px 9px;
+            border: 1px solid #E8DCCB;
+            border-radius: 999px;
+            background: #F6EEE8;
+            color: #5E3E2E;
+            font-size: 0.68rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .pager-btn.active { background: #8B6A5B; color: #fff; border-color: #8B6A5B; }
+        .pager-btn:hover:not(.active) { background: #EFD9D5; }
+
+        /* ── PANEL DERECHO ── */
+        .right-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .filters-bar {
+            background: #fff;
+            border-radius: 14px;
+            padding: 8px 14px;
+            border: 1px solid #E8DCCB;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .filters-bar label { font-size: 0.72rem; font-weight: 600; color: #8B6A5B; white-space: nowrap; }
+        .filters-bar select {
+            flex: 1;
+            font-size: 0.75rem;
+            border: 1px solid #E8DCCB;
+            border-radius: 999px;
+            padding: 5px 14px;
+            background: #F6EEE8;
+            color: #5E3E2E;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0,1fr));
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .kpi-card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 10px 14px;
+            border: 1px solid #E8DCCB;
+        }
+        .kpi-card.accent { border-left: 3px solid #8B6A5B; }
+        .kpi-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            color: #8B6A5B;
+        }
+        .kpi-number {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #5E3E2E;
+            line-height: 1.2;
+            margin-top: 3px;
+        }
+        .kpi-sub { font-size: 0.55rem; color: #B19F8F; margin-top: 2px; }
+
+        .month-chart-container {
+            background: #fff;
+            border-radius: 16px;
+            padding: 10px 14px;
+            border: 1px solid #E8DCCB;
+            flex-shrink: 0;
+        }
+        .month-chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1.5px solid #EFD9D5;
+        }
+        .month-chart-header h4 { font-size: 0.82rem; font-weight: 600; color: #8B6A5B; }
+        .period-selector { display: flex; gap: 4px; }
+        .period-btn {
+            background: #F6EEE8;
+            border: 1px solid #E8DCCB;
+            border-radius: 999px;
+            padding: 3px 10px;
+            font-size: 0.63rem;
+            cursor: pointer;
+            color: #8B6A5B;
+            transition: all 0.15s;
+        }
+        .period-btn.active { background: #8B6A5B; color: #fff; border-color: #8B6A5B; }
+        .period-btn:hover:not(.active) { background: #EFD9D5; }
+
+        .charts-row {
+            display: flex;
+            gap: 12px;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .chart-box {
+            flex: 1;
+            background: #fff;
+            border-radius: 16px;
+            padding: 12px 14px;
+            border: 1px solid #E8DCCB;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .chart-box h4 {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #8B6A5B;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1.5px solid #EFD9D5;
+            flex-shrink: 0;
+        }
+        .chart-box canvas { flex: 1; width: 100% !important; min-height: 0; }
+
+        .top-sellers-box {
+            flex: 1;
+            background: #fff;
+            border-radius: 16px;
+            padding: 12px 14px;
+            border: 1px solid #E8DCCB;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .top-sellers-box h4 {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #8B6A5B;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1.5px solid #EFD9D5;
+            flex-shrink: 0;
+        }
+        .seller-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .seller-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: #FCF9F6;
+            border-radius: 10px;
+            border-left: 3px solid #BFC9B3;
+        }
+        .seller-item.first-place {
+            background: #F2EBE7;
+            border-left: 4px solid #8B6A5B;
+        }
+        .seller-rank { font-size: 0.65rem; font-weight: 700; color: #B19F8F; width: 14px; text-align: center; }
+        .first-place .seller-rank { color: #8B6A5B; }
+        .seller-name { flex: 1; font-size: 0.78rem; font-weight: 500; color: #4A3B32; }
+        .seller-amount { font-size: 0.78rem; font-weight: 700; color: #8B6A5B; }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #EFD9D5; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #BFC9B3; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-layout">
+
+    <div class="left-table">
+        <div class="table-header">
+            <h2>Dashboard de Ventas</h2>
+            <span class="header-meta">
+                <span id="totalCount">—</span> registros ·
+                <span class="bad-count" id="badCount">—</span> con inconsistencias
+            </span>
+        </div>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Buscar por vendedor, producto, ciudad, canal…" />
+        </div>
+        <div class="table-wrapper">
+            <table id="ventasTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortBy('id')">ID</th>
+                        <th onclick="sortBy('vendedor')">Vendedor</th>
+                        <th onclick="sortBy('producto')">Producto</th>
+                        <th onclick="sortBy('categoria')">Categoría</th>
+                        <th onclick="sortBy('cantidad')">Cant.</th>
+                        <th onclick="sortBy('precioUnitario')">Precio</th>
+                        <th onclick="sortBy('total')">Total</th>
+                        <th onclick="sortBy('fecha')">Fecha</th>
+                        <th onclick="sortBy('ciudad')">Ciudad</th>
+                        <th onclick="sortBy('canal')">Canal</th>
+                        <th onclick="sortBy('estado')">Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaBody"></tbody>
+            </table>
+        </div>
+        <div class="pager">
+            <span class="pager-info" id="pagerInfo"></span>
+            <div class="pager-btns" id="pagerBtns"></div>
+        </div>
+    </div>
+
+    <div class="right-content">
+        <div class="filters-bar">
+            <label>Filtrar por categoría:</label>
+            <select id="categoriaFilter"></select>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card accent">
+                <div class="kpi-label">Ventas totales</div>
+                <div class="kpi-number" id="kpiTotalVentas">—</div>
+                <div class="kpi-sub">Monto facturado</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Promedio diario</div>
+                <div class="kpi-number" id="kpiPromedioDiario">—</div>
+                <div class="kpi-sub">Marzo 2026</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Calidad datos</div>
+                <div class="kpi-number" id="kpiDuplicados">—</div>
+                <div class="kpi-sub">Registros duplicados</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Mejor vendedor</div>
+                <div class="kpi-number" id="kpiTopVendedorNombre" style="font-size:0.9rem; line-height:1.3;">—</div>
+                <div class="kpi-sub" id="kpiTopVendedorMonto">—</div>
+            </div>
+        </div>
+
+        <div class="month-chart-container">
+            <div class="month-chart-header">
+                <h4>Ventas por período</h4>
+                <div class="period-selector">
+                    <button class="period-btn" data-period="mes">Mes</button>
+                    <button class="period-btn active" data-period="trimestre">Trimestre</button>
+                    <button class="period-btn" data-period="semestre">Semestre</button>
+                    <button class="period-btn" data-period="anual">Año</button>
+                </div>
+            </div>
+            <canvas id="chartVentasMes" style="max-height:130px; width:100%;"></canvas>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-box">
+                <h4>Distribución por categoría</h4>
+                <canvas id="chartCategorias"></canvas>
+            </div>
+            <div class="top-sellers-box">
+                <h4>Top 5 vendedores</h4>
+                <div id="topSellersList" class="seller-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const rawVentas = [
+        { id:1,  vendedor:"Juan Pérez",       producto:"Laptop",       categoria:"Electrónica",      cantidad:3,  precioUnitario:1200, fecha:"2026-03-01", ciudad:"CDMX",        canal:"Online", estado:"Completada" },
+        { id:2,  vendedor:"Ana Gómez",         producto:"Teléfono",     categoria:"Electrónica",      cantidad:5,  precioUnitario:800,  fecha:"2026-03-02", ciudad:"Guadalajara", canal:"Tienda", estado:"Completada" },
+        { id:3,  vendedor:"Luis Martínez",     producto:"Silla",        categoria:"Muebles",          cantidad:10, precioUnitario:150,  fecha:"2026-03-03", ciudad:"Monterrey",   canal:"Online", estado:"Completada" },
+        { id:4,  vendedor:"María López",       producto:"Escritorio",   categoria:"Muebles",          cantidad:4,  precioUnitario:300,  fecha:"2026-03-04", ciudad:"Puebla",      canal:"Tienda", estado:"Completada" },
+        { id:5,  vendedor:"Carlos Ruiz",       producto:"Monitor",      categoria:"Electrónica",      cantidad:6,  precioUnitario:400,  fecha:"2026-03-05", ciudad:"Querétaro",   canal:"Online", estado:"Completada" },
+        { id:6,  vendedor:"Sofía Herrera",     producto:"Cafetera",     categoria:"Electrodomésticos",cantidad:8,  precioUnitario:200,  fecha:"2026-03-06", ciudad:"León",        canal:"Tienda", estado:"Completada" },
+        { id:7,  vendedor:"Ricardo Díaz",      producto:"Tablet",       categoria:"Electrónica",      cantidad:7,  precioUnitario:600,  fecha:"2026-03-07", ciudad:"CDMX",        canal:"Online", estado:"Completada" },
+        { id:8,  vendedor:"Fernanda Ruiz",     producto:"Sofá",         categoria:"Muebles",          cantidad:2,  precioUnitario:2500, fecha:"2026-03-08", ciudad:"Guadalajara", canal:"Tienda", estado:"Completada" },
+        { id:9,  vendedor:"Miguel Castro",     producto:"Impresora",    categoria:"Electrónica",      cantidad:-3, precioUnitario:-350, fecha:"2026-03-09", ciudad:"Monterrey",   canal:"Online", estado:"Cancelada"  },
+        { id:10, vendedor:"Paola Sánchez",     producto:"Refrigerador", categoria:"Electrodomésticos",cantidad:1,  precioUnitario:5000, fecha:"2026-03-10", ciudad:"Puebla",      canal:"Tienda", estado:"Completada" },
+        { id:11, vendedor:"Diego López",       producto:"Mouse",        categoria:"Electrónica",      cantidad:15, precioUnitario:25,   fecha:"2026-03-11", ciudad:"Querétaro",   canal:"Online", estado:"Completada" },
+        { id:12, vendedor:"Valeria Torres",    producto:"Teclado",      categoria:"Electronica",      cantidad:12, precioUnitario:45,   fecha:"2026-03-12", ciudad:"León",        canal:"Tienda", estado:"Completada" },
+        { id:13, vendedor:"Andrés García",     producto:"Lavadora",     categoria:"Electrodomesticos",cantidad:2,  precioUnitario:4200, fecha:"2026-03-13", ciudad:"CDMX",        canal:"Online", estado:"Completada" },
+        { id:14, vendedor:"Claudia Fernández", producto:"Cámara",       categoria:"Electrónica",      cantidad:4,  precioUnitario:950,  fecha:"2026-03-14", ciudad:"Guadalajara", canal:"Tienda", estado:"Completada" },
+        { id:15, vendedor:"Roberto Morales",   producto:"Mesa",         categoria:"Muebles",          cantidad:5,  precioUnitario:400,  fecha:"2026-03-15", ciudad:"Monterrey",   canal:"Online", estado:"Completada" },
+        { id:16, vendedor:"Patricia Vega",     producto:"Ventilador",   categoria:"Electrodomésticos",cantidad:9,  precioUnitario:150,  fecha:"2026-03-16", ciudad:"Puebla",      canal:"Tienda", estado:"Completada" },
+        { id:17, vendedor:"Hugo Ramírez",      producto:"Smartwatch",   categoria:"Electrónica",      cantidad:6,  precioUnitario:300,  fecha:"2026-03-17", ciudad:"Querétaro",   canal:"Online", estado:"Cancelada"  },
+        { id:18, vendedor:"Gabriela Ortiz",    producto:"Lámpara",      categoria:"Muebles",          cantidad:10, precioUnitario:120,  fecha:"2026-03-18", ciudad:"León",        canal:"Tienda", estado:"Completada" },
+        { id:19, vendedor:"Jorge Hernández",   producto:"Televisión",   categoria:"Elecrtonica",      cantidad:3,  precioUnitario:1800, fecha:"2026-03-19", ciudad:"CDMX",        canal:"Online", estado:"Completada" },
+        { id:19, vendedor:"Jorge Hernández",   producto:"Televisión",   categoria:"Elecrtonica",      cantidad:3,  precioUnitario:1800, fecha:"2026-03-19", ciudad:"CDMX",        canal:"Online", estado:"Completada" },
+        { id:20, vendedor:"Elena Navarro",     producto:"Microondas",   categoria:"Electrodomésticos",cantidad:4,  precioUnitario:700,  fecha:"2026-03-20", ciudad:"Guadalajara", canal:"Tienda", estado:"Completada" }
+    ];
+
+    const catNorm = { "Electronica":"Electrónica", "Elecrtonica":"Electrónica", "Electrodomesticos":"Electrodomésticos" };
+    const uniqueMap = new Map();
+    for (const r of rawVentas) if (!uniqueMap.has(r.id)) uniqueMap.set(r.id, r);
+    const sinDuplicados = Array.from(uniqueMap.values());
+    const dupCount = rawVentas.length - sinDuplicados.length;
+
+    const datosLimpios = sinDuplicados.map(r => ({
+        ...r,
+        categoria: catNorm[r.categoria] || r.categoria,
+        total: r.cantidad * r.precioUnitario
+    }));
+    const esValido = r => r.cantidad > 0 && r.precioUnitario > 0 && r.estado === "Completada";
+    const datosValidos = datosLimpios.filter(esValido);
+
+    const PALETTE = ['#8B6A5B', '#BFC9B3', '#EFD9D5', '#C2A88D', '#E8DCCB'];
+
+    let currentPeriod = "trimestre";
+    let sortKey = "id", sortAsc = true;
+    let currentPage = 1;
+    const PER_PAGE = 9;
+    let chartMes = null, chartCat = null;
+
+    const fmt = n => "$" + Math.round(n).toLocaleString("es-MX");
+
+    function getFiltered() {
+        const cat = document.getElementById("categoriaFilter").value;
+        const q   = document.getElementById("searchInput").value.toLowerCase().trim();
+        return datosLimpios.filter(r => {
+            if (cat !== "TODAS" && r.categoria !== cat) return false;
+            if (q && ![r.vendedor, r.producto, r.ciudad, r.canal, r.estado, r.categoria]
+                .some(v => v.toLowerCase().includes(q))) return false;
+            return true;
+        });
+    }
+
+    function sortBy(key) {
+        if (sortKey === key) sortAsc = !sortAsc;
+        else { sortKey = key; sortAsc = true; }
+        currentPage = 1;
+        renderTable();
+    }
+
+    function renderTable() {
+        let rows = [...getFiltered()];
+        rows.sort((a, b) => {
+            const va = a[sortKey], vb = b[sortKey];
+            if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            return sortAsc ? va - vb : vb - va;
+        });
+
+        document.getElementById("totalCount").textContent = datosLimpios.length;
+        document.getElementById("badCount").textContent   = datosLimpios.filter(r => !esValido(r)).length;
+
+        document.querySelectorAll("thead th").forEach(th => th.classList.remove("sort-asc", "sort-desc"));
+        const headers = ["id","vendedor","producto","categoria","cantidad","precioUnitario","total","fecha","ciudad","canal","estado"];
+        const idx = headers.indexOf(sortKey);
+        if (idx >= 0) document.querySelectorAll("thead th")[idx].classList.add(sortAsc ? "sort-asc" : "sort-desc");
+
+        const total  = rows.length;
+        const pages  = Math.max(1, Math.ceil(total / PER_PAGE));
+        if (currentPage > pages) currentPage = pages;
+        const slice  = rows.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+        const tbody = document.getElementById("tablaBody");
+        tbody.innerHTML = "";
+        slice.forEach(r => {
+            const bad = !esValido(r);
+            const tr  = document.createElement("tr");
+            if (bad) tr.className = "row-bad";
+            tr.innerHTML = `
+                <td>${r.id}</td>
+                <td>${r.vendedor}</td>
+                <td>${r.producto}</td>
+                <td>${r.categoria}</td>
+                <td style="text-align:right">${r.cantidad}</td>
+                <td style="text-align:right">$${r.precioUnitario.toLocaleString()}</td>
+                <td style="text-align:right">${fmt(r.total)}</td>
+                <td>${r.fecha.slice(5)}</td>
+                <td>${r.ciudad}</td>
+                <td>${r.canal}</td>
+                <td><span class="badge ${r.estado === 'Completada' ? 'badge-ok' : 'badge-err'}">${r.estado}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById("pagerInfo").textContent =
+            `${(currentPage - 1) * PER_PAGE + 1}–${Math.min(currentPage * PER_PAGE, total)} de ${total}`;
+        const pb = document.getElementById("pagerBtns");
+        pb.innerHTML = "";
+        for (let i = 1; i <= pages; i++) {
+            const b = document.createElement("button");
+            b.className = "pager-btn" + (i === currentPage ? " active" : "");
+            b.textContent = i;
+            b.onclick = () => { currentPage = i; renderTable(); };
+            pb.appendChild(b);
+        }
+    }
+
+    function renderKPIs() {
+        const cat  = document.getElementById("categoriaFilter").value;
+        const rows = cat === "TODAS" ? datosValidos : datosValidos.filter(r => r.categoria === cat);
+        const total = rows.reduce((s, r) => s + r.total, 0);
+        const dias  = new Set(rows.map(r => r.fecha)).size || 1;
+        document.getElementById("kpiTotalVentas").textContent    = fmt(total);
+        document.getElementById("kpiPromedioDiario").textContent = fmt(total / dias);
+        document.getElementById("kpiDuplicados").textContent     = `${((dupCount / rawVentas.length) * 100).toFixed(1)}% (${dupCount})`;
+        const byV = new Map();
+        rows.forEach(r => byV.set(r.vendedor, (byV.get(r.vendedor) || 0) + r.total));
+        let top = null, max = 0;
+        for (const [v, m] of byV) if (m > max) { max = m; top = v; }
+        document.getElementById("kpiTopVendedorNombre").textContent = top || "N/A";
+        document.getElementById("kpiTopVendedorMonto").textContent  = top ? fmt(max) : "$0";
+    }
+
+    function getPeriodData(rows) {
+        const monthly = new Array(12).fill(0);
+        rows.forEach(r => { monthly[+r.fecha.split("-")[1] - 1] += r.total; });
+        if (currentPeriod === "mes")
+            return { labels: ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"], values: monthly };
+        if (currentPeriod === "trimestre") {
+            const t = [0,0,0,0];
+            monthly.forEach((v,i) => t[Math.floor(i/3)] += v);
+            return { labels: ["Ene–Mar","Abr–Jun","Jul–Sep","Oct–Dic"], values: t };
+        }
+        if (currentPeriod === "semestre") {
+            const s = [0,0];
+            monthly.forEach((v,i) => s[Math.floor(i/6)] += v);
+            return { labels: ["Ene–Jun","Jul–Dic"], values: s };
+        }
+        return { labels: ["2026"], values: [monthly.reduce((a,b) => a+b, 0)] };
+    }
+
+    function renderBarChart() {
+        const cat  = document.getElementById("categoriaFilter").value;
+        const rows = cat === "TODAS" ? datosValidos : datosValidos.filter(r => r.categoria === cat);
+        const { labels, values } = getPeriodData(rows);
+        if (chartMes) chartMes.destroy();
+        chartMes = new Chart(document.getElementById("chartVentasMes"), {
+            type: "bar",
+            data: { labels, datasets: [{ data: values, backgroundColor: "#BFC9B3", hoverBackgroundColor: "#8B6A5B", borderRadius: 5 }] },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { font: { size: 9 }, callback: v => "$" + Math.round(v/1000) + "k" }, grid: { color: "#F0E4DC" } },
+                    x: { ticks: { font: { size: 9 } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    function renderPieChart() {
+        const cat  = document.getElementById("categoriaFilter").value;
+        const rows = cat === "TODAS" ? datosValidos : datosValidos.filter(r => r.categoria === cat);
+        const map  = new Map();
+        rows.forEach(r => map.set(r.categoria, (map.get(r.categoria) || 0) + r.total));
+        const labels = [...map.keys()];
+        const data   = labels.map(l => map.get(l));
+        if (chartCat) chartCat.destroy();
+        chartCat = new Chart(document.getElementById("chartCategorias"), {
+            type: "doughnut",
+            data: { labels, datasets: [{ data, backgroundColor: PALETTE, borderWidth: 3, borderColor: "#fff" }] },
+            options: {
+                responsive: true, maintainAspectRatio: true, cutout: "55%",
+                plugins: {
+                    legend: { position: "bottom", labels: { font: { size: 9 }, boxWidth: 10, padding: 8 } },
+                    tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)}` } }
+                }
+            }
+        });
+    }
+
+    function renderSellers() {
+        const cat  = document.getElementById("categoriaFilter").value;
+        const rows = cat === "TODAS" ? datosValidos : datosValidos.filter(r => r.categoria === cat);
+        const map  = new Map();
+        rows.forEach(r => map.set(r.vendedor, (map.get(r.vendedor) || 0) + r.total));
+        const top5 = [...map.entries()].sort((a,b) => b[1]-a[1]).slice(0,5);
+        const el = document.getElementById("topSellersList");
+        el.innerHTML = "";
+        top5.forEach(([name, amount], i) => {
+            const div = document.createElement("div");
+            div.className = "seller-item" + (i === 0 ? " first-place" : "");
+            div.innerHTML = `
+                <span class="seller-rank">${i+1}</span>
+                <span class="seller-name">${name}</span>
+                <span class="seller-amount">${fmt(amount)}</span>
+            `;
+            el.appendChild(div);
+        });
+    }
+
+    function poblarFiltro() {
+        const cats = ["TODAS", ...[...new Set(datosLimpios.map(r => r.categoria))].sort()];
+        const sel  = document.getElementById("categoriaFilter");
+        sel.innerHTML = cats.map(c => `<option value="${c}">${c === "TODAS" ? "Todas las categorías" : c}</option>`).join("");
+    }
+
+    function refresh() {
+        currentPage = 1;
+        renderTable();
+        renderKPIs();
+        renderBarChart();
+        renderPieChart();
+        renderSellers();
+    }
+
+    poblarFiltro();
+    renderTable();
+    renderKPIs();
+    renderBarChart();
+    renderPieChart();
+    renderSellers();
+
+    document.getElementById("categoriaFilter").onchange = refresh;
+    document.getElementById("searchInput").oninput = () => { currentPage = 1; renderTable(); };
+
+    document.querySelectorAll(".period-btn").forEach(btn => {
+        btn.onclick = function () {
+            document.querySelectorAll(".period-btn").forEach(b => b.classList.remove("active"));
+            this.classList.add("active");
+            currentPeriod = this.dataset.period;
+            renderBarChart();
+        };
+    });
+</script>
+</body>
+</html>
